@@ -1,126 +1,145 @@
 <!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8">
-  <title>Échecs ultra-léger</title>
-  <style>
-    body {
-      font-family: monospace;
-      background: #fff;
-      color: #000;
-      text-align: center;
-    }
-    table {
-      border-collapse: collapse;
-      margin: auto;
-    }
-    td {
-      width: 24px;
-      height: 24px;
-      border: 1px solid #000;
-      text-align: center;
-      vertical-align: middle;
-      font-size: 16px;
-    }
-    .w { background: #eee; }
-    .b { background: #aaa; }
-  </style>
-</head>
+<html>
+<head><meta charset="utf-8"><title>Mini Échecs</title></head>
 <body>
-  <h1>Échecs ultra-léger</h1>
-  <p>Difficulté : 
-    <select id="difficulty">
-      <option value="1">Facile</option>
-      <option value="2">Normal</option>
-      <option value="3">Difficile</option>
-    </select>
-  </p>
-  <table id="board"></table>
+<pre id="board"></pre>
+<form onsubmit="play();return false;">
+  <label>Votre coup (ex: e2e4): <input id="move" /></label>
+  <input type="submit" value="Jouer">
+</form>
+<script>
+var b = [
+  ['r','n','b','q','k','b','n','r'],
+  ['p','p','p','p','p','p','p','p'],
+  ['.','.','.','.','.','.','.','.'],
+  ['.','.','.','.','.','.','.','.'],
+  ['.','.','.','.','.','.','.','.'],
+  ['.','.','.','.','.','.','.','.'],
+  ['P','P','P','P','P','P','P','P'],
+  ['R','N','B','Q','K','B','N','R']
+];
+var pos = "abcdefgh";
 
-  <script>
-    const boardEl = document.getElementById("board");
-    let board = [];
-    let selected = null;
+function draw() {
+  var o = "  a b c d e f g h\n";
+  for (var y = 0; y < 8; y++) {
+    o += (8 - y) + " ";
+    for (var x = 0; x < 8; x++) o += b[y][x] + " ";
+    o += (8 - y) + "\n";
+  }
+  o += "  a b c d e f g h";
+  document.getElementById('board').textContent = o;
+}
 
-    const pieces = {
-      r: "♜", n: "♞", b: "♝", q: "♛", k: "♚", p: "♟",
-      R: "♖", N: "♘", B: "♗", Q: "♕", K: "♔", P: "♙"
-    };
+function parseMove(m) {
+  if (m.length !== 4) return null;
+  var x1 = pos.indexOf(m[0]), y1 = 8 - parseInt(m[1]);
+  var x2 = pos.indexOf(m[2]), y2 = 8 - parseInt(m[3]);
+  if (x1<0||x2<0||y1<0||y2<0||x1>7||x2>7||y1>7||y2>7) return null;
+  return [x1,y1,x2,y2];
+}
 
-    function initialBoard() {
-      return [
-        ["r","n","b","q","k","b","n","r"],
-        ["p","p","p","p","p","p","p","p"],
-        [" "," "," "," "," "," "," "," "],
-        [" "," "," "," "," "," "," "," "],
-        [" "," "," "," "," "," "," "," "],
-        [" "," "," "," "," "," "," "," "],
-        ["P","P","P","P","P","P","P","P"],
-        ["R","N","B","Q","K","B","N","R"]
-      ];
-    }
+function isPathClear(x1, y1, x2, y2) {
+  var dx = x2 - x1, dy = y2 - y1;
+  var steps = Math.max(Math.abs(dx), Math.abs(dy));
+  var sx = dx == 0 ? 0 : dx / Math.abs(dx);
+  var sy = dy == 0 ? 0 : dy / Math.abs(dy);
+  for (var i = 1; i < steps; i++) {
+    var xi = x1 + sx * i, yi = y1 + sy * i;
+    if (b[yi][xi] !== '.') return false;
+  }
+  return true;
+}
 
-    function drawBoard() {
-      boardEl.innerHTML = "";
-      for (let y = 0; y < 8; y++) {
-        const row = document.createElement("tr");
-        for (let x = 0; x < 8; x++) {
-          const cell = document.createElement("td");
-          cell.className = (x + y) % 2 === 0 ? "w" : "b";
-          cell.textContent = pieces[board[y][x]] || board[y][x];
-          cell.onclick = () => clickCell(x, y);
-          row.appendChild(cell);
-        }
-        boardEl.appendChild(row);
+function isLegalMove(x1, y1, x2, y2) {
+  var p = b[y1][x1];
+  var dx = x2 - x1, dy = y2 - y1;
+  var tx = b[y2][x2];
+  if (/[A-Z]/.test(tx)) return false;
+  if (p === 'P') {
+    if (dx === 0 && tx === '.' && (dy === -1 || (y1 === 6 && dy === -2 && b[y1 - 1][x1] === '.'))) return true;
+    if (Math.abs(dx) === 1 && dy === -1 && /[a-z]/.test(tx)) return true;
+  }
+  if (p === 'R') {
+    if ((dx === 0 || dy === 0) && isPathClear(x1, y1, x2, y2)) return true;
+  }
+  if (p === 'B') {
+    if (Math.abs(dx) === Math.abs(dy) && isPathClear(x1, y1, x2, y2)) return true;
+  }
+  if (p === 'Q') {
+    if ((Math.abs(dx) === Math.abs(dy) || dx === 0 || dy === 0) && isPathClear(x1, y1, x2, y2)) return true;
+  }
+  if (p === 'N') {
+    if ((Math.abs(dx) === 2 && Math.abs(dy) === 1) || (Math.abs(dx) === 1 && Math.abs(dy) === 2)) return true;
+  }
+  if (p === 'K') {
+    if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) return true;
+  }
+  return false;
+}
+
+function play() {
+  var m = document.getElementById('move').value;
+  var mv = parseMove(m);
+  if (!mv) return alert("Mouvement invalide");
+  var x1 = mv[0], y1 = mv[1], x2 = mv[2], y2 = mv[3];
+  var p = b[y1][x1];
+  if (!/[PNBRQK]/.test(p)) return alert("Pas votre pièce");
+  if (!isLegalMove(x1, y1, x2, y2)) return alert("Coup interdit");
+  b[y2][x2] = (p === 'P' && y2 === 0) ? 'Q' : p; // promotion
+  b[y1][x1] = '.';
+  draw();
+  setTimeout(aiMove, 300);
+}
+
+function aiMove() {
+  var moves = [];
+  for (var y=0; y<8; y++) for (var x=0; x<8; x++) {
+    var p = b[y][x];
+    if (/[prnbqk]/.test(p)) {
+      for (var dy=-2; dy<=2; dy++) for (var dx=-2; dx<=2; dx++) {
+        var x2 = x + dx, y2 = y + dy;
+        if (x2<0||x2>7||y2<0||y2>7) continue;
+        if (/[a-z]/.test(p) && isLegalMoveAI(x, y, x2, y2)) moves.push([x,y,x2,y2]);
       }
     }
+  }
+  if (moves.length==0) return alert("IA bloquée");
+  var m = moves[Math.floor(Math.random()*moves.length)];
+  var p = b[m[1]][m[0]];
+  b[m[3]][m[2]] = (p === 'p' && m[3] === 7) ? 'q' : p;
+  b[m[1]][m[0]] = '.';
+  draw();
+}
 
-    function clickCell(x, y) {
-      const piece = board[y][x];
-      if (selected) {
-        const [sx, sy] = selected;
-        if (sx === x && sy === y) {
-          selected = null; // annulation du déplacement si même case cliquée
-          return;
-        }
-        board[y][x] = board[sy][sx];
-        board[sy][sx] = " ";
-        selected = null;
-        drawBoard();
-        setTimeout(aiMove, 100);
-      } else if (/[PNBRQK]/.test(piece)) {
-        selected = [x, y];
-      }
-    }
+function isLegalMoveAI(x1, y1, x2, y2) {
+  var p = b[y1][x1];
+  var dx = x2 - x1, dy = y2 - y1;
+  var tx = b[y2][x2];
+  if (/[a-z]/.test(tx)) return false;
+  if (p === 'p') {
+    if (dx === 0 && tx === '.' && (dy === 1 || (y1 === 1 && dy === 2 && b[y1 + 1][x1] === '.'))) return true;
+    if (Math.abs(dx) === 1 && dy === 1 && /[A-Z]/.test(tx)) return true;
+  }
+  if (p === 'r') {
+    if ((dx === 0 || dy === 0) && isPathClear(x1, y1, x2, y2)) return true;
+  }
+  if (p === 'b') {
+    if (Math.abs(dx) === Math.abs(dy) && isPathClear(x1, y1, x2, y2)) return true;
+  }
+  if (p === 'q') {
+    if ((Math.abs(dx) === Math.abs(dy) || dx === 0 || dy === 0) && isPathClear(x1, y1, x2, y2)) return true;
+  }
+  if (p === 'n') {
+    if ((Math.abs(dx) === 2 && Math.abs(dy) === 1) || (Math.abs(dx) === 1 && Math.abs(dy) === 2)) return true;
+  }
+  if (p === 'k') {
+    if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) return true;
+  }
+  return false;
+}
 
-    function aiMove() {
-      const difficulty = +document.getElementById("difficulty").value;
-      let moves = [];
-      for (let y = 0; y < 8; y++) {
-        for (let x = 0; x < 8; x++) {
-          const p = board[y][x];
-          if (/[pnbrqk]/.test(p)) {
-            // IA très simpliste : déplacement de pions aléatoire
-            let dirs = [[0, 1], [1, 1], [-1, 1]];
-            dirs.forEach(d => {
-              const nx = x + d[0], ny = y + d[1];
-              if (ny < 8 && nx >= 0 && nx < 8 && /[PNBRQK ]/.test(board[ny][nx]))
-                moves.push([[x, y], [nx, ny]]);
-            });
-          }
-        }
-      }
-      if (moves.length > 0) {
-        const move = moves[Math.floor(Math.random() * moves.length / difficulty)];
-        const [[x1, y1], [x2, y2]] = move;
-        board[y2][x2] = board[y1][x1];
-        board[y1][x1] = " ";
-        drawBoard();
-      }
-    }
-
-    board = initialBoard();
-    drawBoard();
-  </script>
+draw();
+</script>
 </body>
 </html>
